@@ -1,6 +1,6 @@
 -- ========================================================
--- VeraXS Hub v2 - MAC ÇÖKME ENGELLİ SAĞ ORTA SABİT SÜRÜM
--- Menüyü Açıp Kapatmak / Gizlemek İçin Klavyeden "H" Tuşuna Basın!
+-- VeraXS Hub v3 - WINDOWS, ANDROID & MAC UYUMLU MULTI SÜRÜM
+-- Menüyü Gizlemek/Açmak İçin Klavyeden "H" Tuşuna Basın!
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -9,48 +9,50 @@ local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
--- Eski hatalı sürümleri tamamen temizle
-if game.CoreGui:FindFirstChild("VeraMinimalGui") then
-    game.CoreGui.VeraMinimalGui:Destroy()
+-- Tüm platformlarda eski arayüz kalıntılarını güvenle temizleme
+local TargetGuiParent = game:GetService("CoreGui")
+if not pcall(function() local a = game.CoreGui.Name end) then
+    TargetGuiParent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+if TargetGuiParent:FindFirstChild("VeraCrossGui") then
+    TargetGuiParent.VeraCrossGui:Destroy()
 end
 
 -- ========================================================
--- 1. SAĞ ORTAYA SABİTLENMİŞ ARAYÜZ (GUI)
+-- 1. SAĞ ORTA SABİT EVRENSEL ARAYÜZ (GUI)
 -- ========================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VeraMinimalGui"
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "VeraCrossGui"
+ScreenGui.Parent = TargetGuiParent
 ScreenGui.ResetOnSpawn = false
 
--- Ana Menü Kutusu (Sağ Ortaya Sabitlendi, Çökmeyi Önlemek İçin Sürükleme Kapatıldı)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 220, 0, 190)
--- AnchorPoint'i (0.5, 0.5) yaparak dikeyde tam ortaladık
 MainFrame.AnchorPoint = Vector2.new(1, 0.5) 
--- Ekranın sağ kenarına (X: 0.98) ve dikey ortasına (Y: 0.5) yerleştirildi
-MainFrame.Position = UDim2.new(0.98, 0, 0.5, 0) 
+MainFrame.Position = UDim2.new(0.98, 0, 0.5, 0) -- Sağ orta sabit
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 2
 MainFrame.BorderColor3 = Color3.fromRGB(175, 25, 255) -- VeraXS Moru
-MainFrame.Active = false -- Sürükleme kilitli (Çökmeyi önleyen ana ayar)
+MainFrame.Active = false
 MainFrame.Draggable = false
 MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 
--- Başlık ve Bilgilendirme
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "  VeraXS Hub v2 [H tuşu]"
+Title.Text = "  VeraXS Hub v3 [H Tuşu]"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 11
+Title.TextSize = 12
 Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
--- KLAVYE İLE GİZLEME MOTORU ("H" Tuşu Kontrolü)
+-- PC'ler için H tuşu ile gizleme özelliği
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end 
     if input.KeyCode == Enum.KeyCode.H then
@@ -93,17 +95,20 @@ end
 
 CreateMenuButton("Auto Aim (Kesin Kilit)", 45, function(status) AimbotEnabled = status end)
 CreateMenuButton("Triggerbot (Anında Sık)", 90, function(status) TriggerbotEnabled = status end)
-CreateMenuButton("ESP (Kalın Duvar Arkası)", 135, function(status) 
+CreateMenuButton("ESP (Tüm Cihazlar)", 135, function(status) 
     EspEnabled = status 
     if not status then
-        for _, v in ipairs(game.CoreGui:GetChildren()) do
-            if string.find(v.Name, "_VeraESP") then v:Destroy() end
+        -- ESP kapatıldığında tüm haritadaki morlukları temizler
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character and player.Character:FindFirstChild("VeraHighlight") then
+                player.Character.VeraHighlight:Destroy()
+            end
         end
     end
 end)
 
 -- ========================================================
--- 2. GELİŞMİŞ HIZLI HEDEF BULUCU
+-- 2. DÜNYA GENELİ EN YAKIN HEDEF BULUCU
 -- ========================================================
 local function GetClosestPlayer()
     local ClosestTarget = nil
@@ -121,11 +126,11 @@ local function GetClosestPlayer()
 end
 
 -- ========================================================
--- 3. HİLE MOTORU MERKEZİ DÖNGÜSÜ
+-- 3. EVRENSEL ÇAPRAZ PLATFORM HİLE DÖNGÜSÜ
 -- ========================================================
 RunService.RenderStepped:Connect(function()
     
-    -- [AIMBOT MOTORU]
+    -- [AIMBOT] - Çalışan Kilit Sistemi Korundu
     if AimbotEnabled then
         local TargetPlayer = GetClosestPlayer()
         if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
@@ -133,12 +138,25 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- [TRIGGERBOT MOTORU]
+    -- [EVRENSEL TRIGGERBOT] - Windows, Mobil ve Mac Hibrit Ateşleyici
     if TriggerbotEnabled and Mouse.Target then
         local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
         if TargetModel then
             local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
             if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 then
+                -- Cihaz türüne göre en hızlı ateş etme metodunu seçer
+                if mouse1press and mouse1release then
+                    -- Windows & Bazı Güçlü Executorlar İçin Hızlı Tıklama
+                    mouse1press()
+                    task.wait(0.01)
+                    mouse1release()
+                elseif VirtualUser then
+                    -- Android ve Mac Emulator Sinyali ile Hızlı Tıklama
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(0, 0))
+                end
+                
+                -- Yedekleme Güvenliği: Eğer ikisi de çalışmazsa silahı oyun içinden tetikler
                 local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
                 if Tool then
                     Tool:Activate()
@@ -147,46 +165,25 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- [ESP MOTORU]
+    -- [EVRENSEL GÜÇLÜ ESP] - Duvar Arkası Kalın Belirgin Highlight
     if EspEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-                local RootPart = player.Character.HumanoidRootPart
-                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
-                
-                local EspFolderName = player.Name .. "_VeraESP"
-                local ExistingEsp = game.CoreGui:FindFirstChild(EspFolderName)
-                
-                if not ExistingEsp then
-                    local BoxGui = Instance.new("ScreenGui")
-                    BoxGui.Name = EspFolderName
-                    BoxGui.Parent = game.CoreGui
-                    BoxGui.ResetOnSpawn = false
-                    
-                    local Box = Instance.new("Frame")
-                    Box.Name = "Box"
-                    Box.BackgroundTransparency = 1
-                    Box.BorderSizePixel = 4
-                    Box.BorderColor3 = Color3.fromRGB(175, 25, 255)
-                    Box.Parent = BoxGui
-                end
-                
-                local BoxGui = game.CoreGui:FindFirstChild(EspFolderName)
-                if BoxGui and BoxGui:FindFirstChild("Box") then
-                    local Box = BoxGui.Box
-                    local Distance = (Camera.CFrame.Position - RootPart.Position).magnitude
-                    
-                    local SizeX = 2200 / Distance
-                    local SizeY = 3600 / Distance
-                    
-                    Box.Visible = true
-                    Box.Size = UDim2.new(0, SizeX, 0, SizeY)
-                    Box.Position = UDim2.new(0, ScreenPos.X - (SizeX / 2), 0, ScreenPos.Y - (SizeY / 2))
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                local Char = player.Character
+                if not Char:FindFirstChild("VeraHighlight") then
+                    local Highlight = Instance.new("Highlight")
+                    Highlight.Name = "VeraHighlight"
+                    Highlight.FillColor = Color3.fromRGB(175, 25, 255) -- Neon Canlı Mor
+                    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255) -- Parlak Beyaz
+                    Highlight.FillTransparency = 0.35 -- Çok daha belirgin opaklık
+                    Highlight.OutlineTransparency = 0
+                    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Kesin Duvar Arkası Gösterimi
+                    Highlight.Parent = Char
                 end
             else
-                local EspFolderName = player.Name .. "_VeraESP"
-                if game.CoreGui:FindFirstChild("VeraMinimalGui") and game.CoreGui:FindFirstChild(EspFolderName) then
-                    game.CoreGui[EspFolderName]:Destroy()
+                -- Ölenlerin veya çıkanların mor çizgilerini temizle
+                if player.Character and player.Character:FindFirstChild("VeraHighlight") then
+                    player.Character.VeraHighlight:Destroy()
                 end
             end
         end
