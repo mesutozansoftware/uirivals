@@ -1,5 +1,5 @@
 -- ========================================================
--- VeraXS Hub v2 - MAC İÇİN ULTRA HAFİF MİNİMALİST MENÜ
+-- VeraXS Hub v2 - MAC PENCERELİ/TAM EKRAN UYUMLU SÜRÜM
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -7,8 +7,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local VirtualUser = game:GetService("VirtualUser")
 
 -- Eski hatalı GUI yapılarını temizle
 if game.CoreGui:FindFirstChild("VeraMinimalGui") then
@@ -16,26 +14,24 @@ if game.CoreGui:FindFirstChild("VeraMinimalGui") then
 end
 
 -- ========================================================
--- 1. MAC DOSTU TEMEL ARAYÜZ (GUI) KURULUMU
+-- 1. ULTRA HAFİF ARAYÜZ (GUI)
 -- ========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VeraMinimalGui"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 
--- Ana Pencere Kartı (Ekranın ortasında sade gri bir kutu)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 220, 0, 190)
-MainFrame.Position = UDim2.new(0.4, 0, 0.4, 0)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0) -- Sol üst köşeye yakın açılır, tam ekranda kaybolmaz
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 2
 MainFrame.BorderColor3 = Color3.fromRGB(70, 70, 70)
 MainFrame.Active = true
-MainFrame.Draggable = true -- Mac Touchpad ile sürüklenebilir
+MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Başlık
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
@@ -46,18 +42,16 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
--- Durum Değişkenleri
 local AimbotEnabled = false
 local TriggerbotEnabled = false
 local EspEnabled = false
 
--- Buton Yapıcı Yardımcı Fonksiyon
 local function CreateMenuButton(text, positionY, callback)
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(1, -20, 0, 35)
     Button.Position = UDim2.new(0, 10, 0, positionY)
     Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    Button.TextColor3 = Color3.fromRGB(255, 100, 100) -- Başlangıçta kırmızı (KAPALI)
+    Button.TextColor3 = Color3.fromRGB(255, 100, 100)
     Button.Text = text .. " [KAPALI]"
     Button.TextSize = 13
     Button.Font = Enum.Font.SourceSansBold
@@ -81,21 +75,10 @@ local function CreateMenuButton(text, positionY, callback)
     end)
 end
 
--- ========================================================
--- 2. MENÜ BUTONLARININ TANIMLANMASI
--- ========================================================
-
-CreateMenuButton("Auto Aim (Kafa)", 45, function(status)
-    AimbotEnabled = status
-end)
-
-CreateMenuButton("Triggerbot (Oto Sık)", 90, function(status)
-    TriggerbotEnabled = status
-end)
-
-CreateMenuButton("ESP / Wallhack", 135, function(status)
-    EspEnabled = status
-    -- ESP kapatıldıysa ekrandaki çizgileri temizle
+CreateMenuButton("Auto Aim (Kafa)", 45, function(status) AimbotEnabled = status end)
+CreateMenuButton("Triggerbot (Oto Sık)", 90, function(status) TriggerbotEnabled = status end)
+CreateMenuButton("ESP / Wallhack", 135, function(status) 
+    EspEnabled = status 
     if not status then
         for _, v in ipairs(workspace:GetDescendants()) do
             if v.Name == "VeraHighlight" then v:Destroy() end
@@ -104,7 +87,7 @@ CreateMenuButton("ESP / Wallhack", 135, function(status)
 end)
 
 -- ========================================================
--- 3. EN YAKIN OYUNCU BULUCU VE HİLE MOTORU
+-- 2. EN YAKIN OYUNCU BULUCU VE HİLE MOTORU
 -- ========================================================
 local function GetClosestPlayer()
     local ClosestTarget = nil
@@ -121,12 +104,11 @@ local function GetClosestPlayer()
     return ClosestTarget
 end
 
--- Mac'in işlemcisini yormayan, saniyede 30 kez dönen güvenli ana döngü
+-- Tam ekranda donmayı önleyen, saniyede 30 kez dönen güvenli ana döngü
 task.spawn(function()
     while true do
         task.wait(0.03)
         
-        -- Aimbot Çalışma Mantığı
         if AimbotEnabled then
             local TargetPlayer = GetClosestPlayer()
             if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
@@ -134,19 +116,20 @@ task.spawn(function()
             end
         end
 
-        -- Triggerbot Çalışma Mantığı
         if TriggerbotEnabled and Mouse.Target then
             local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
             if TargetModel then
                 local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
                 if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 then
-                    VirtualUser:CaptureController()
-                    VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    -- Mac uyumlu sol tıklama komutu
+                    local MouseClickSim = game:GetService("VirtualUser")
+                    MouseClickSim:Button1Down(Vector2.new(0, 0))
+                    task.wait(0.01)
+                    MouseClickSim:Button1Up(Vector2.new(0, 0))
                 end
             end
         end
         
-        -- ESP Dinamik Yenileme Mantığı
         if EspEnabled then
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
