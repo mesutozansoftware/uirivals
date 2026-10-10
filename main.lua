@@ -1,5 +1,6 @@
 -- ========================================================
--- VeraXS Hub v3 - DUVAR ARKASI (WALL-CHECK) KORUMALI MULTI
+-- VeraXS Hub v4.0 - EVRENSEL FARE KİLİTLİ STABİL MOTHERSCRIPT
+-- Windows, Android ve Mac üzerinde %100 Çalışır
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -8,7 +9,6 @@ local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local VirtualUser = game:GetService("VirtualUser")
 
 local TargetGuiParent = game:GetService("CoreGui")
 if not pcall(function() local a = game.CoreGui.Name end) then
@@ -19,9 +19,7 @@ if TargetGuiParent:FindFirstChild("VeraCrossGui") then
     TargetGuiParent.VeraCrossGui:Destroy()
 end
 
--- ========================================================
--- ARAYÜZ (GUI) KURULUMU
--- ========================================================
+-- SAF ARAYÜZ KURULUMU
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VeraCrossGui"
 ScreenGui.Parent = TargetGuiParent
@@ -29,7 +27,7 @@ ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 190)
+MainFrame.Size = UDim2.new(0, 220, 0, 150)
 MainFrame.AnchorPoint = Vector2.new(1, 0.5) 
 MainFrame.Position = UDim2.new(0.98, 0, 0.5, 0) 
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -43,7 +41,7 @@ MainFrame.Parent = ScreenGui
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "  VeraXS Hub v3 [H Tuşu]"
+Title.Text = "  VeraXS Hub v4 [H Tuşu]"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 12
 Title.Font = Enum.Font.SourceSansBold
@@ -58,7 +56,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 local AimbotEnabled = false
-local TriggerbotEnabled = false
 local EspEnabled = false
 
 local function CreateMenuButton(text, positionY, callback)
@@ -91,8 +88,7 @@ local function CreateMenuButton(text, positionY, callback)
 end
 
 CreateMenuButton("Auto Aim (Kesin Kilit)", 45, function(status) AimbotEnabled = status end)
-CreateMenuButton("Triggerbot (Hızlı Spam)", 90, function(status) TriggerbotEnabled = status end)
-CreateMenuButton("ESP (Tüm Cihazlar)", 135, function(status) 
+CreateMenuButton("ESP (Tüm Cihazlar)", 90, function(status) 
     EspEnabled = status 
     if not status then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -103,47 +99,40 @@ CreateMenuButton("ESP (Tüm Cihazlar)", 135, function(status)
     end
 end)
 
--- ========================================================
--- DUVAR / ENGEL KONTROLÜ (RAYCASTING WALL-CHECK)
--- ========================================================
+-- DUVAR KONTROLÜ
 local function IsVisible(targetPart)
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return false end
-    
     local Origin = Camera.CFrame.Position
     local Direction = (targetPart.Position - Origin)
-    
     local RaycastParamsArgs = RaycastParams.new()
-    -- Işın atılırken kendi karakterimizi ve haritadaki görünmez efektleri yok saymasını sağlıyoruz
     RaycastParamsArgs.FilterInstanceTable = {LocalPlayer.Character, Camera}
     RaycastParamsArgs.FilterType = Enum.RaycastFilterType.Exclude
     RaycastParamsArgs.IgnoreWater = true
-    
     local Result = workspace:Raycast(Origin, Direction, RaycastParamsArgs)
-    
-    -- Eğer ışın hedefe ulaşana kadar hiçbir şeye (duvara) çarpmadıysa veya çarptığı şey düşmanın kendi vücuduysa true döner
     if Result == nil or Result.Instance:IsDescendantOf(targetPart.Parent) then
         return true
     end
     return false
 end
 
--- ========================================================
--- KORUMALI EN YAKIN HEDEF BULUCU (DUVAR KONTROLLÜ)
--- ========================================================
-local function GetClosestPlayer()
+-- EKRANDAKİ EN YAKIN HEDEFİ BULUCU (TİTREMEYİ ÖNLER)
+local function GetClosestPlayerToMouse()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return nil end
-    
     local ClosestTarget = nil
     local ShortestDistance = math.huge
+    
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            
-            -- Duvar Kontrolü: Eğer düşman duvar arkasındaysa onu pas geçiyoruz (Çökmeyi önler)
             if IsVisible(player.Character.Head) then
-                local Distance = (Camera.CFrame.Position - player.Character.Head.Position).magnitude
-                if Distance < ShortestDistance then
-                    ShortestDistance = Distance
-                    ClosestTarget = player
+                -- Düşmanın kafasının ekrandaki 2D pozisyonunu alır
+                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                if OnScreen then
+                    -- Farenin imlecine en yakın olan oyuncuyu hesaplar
+                    local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).magnitude
+                    if Distance < ShortestDistance then
+                        ShortestDistance = Distance
+                        ClosestTarget = player
+                    end
                 end
             end
         end
@@ -151,19 +140,30 @@ local function GetClosestPlayer()
     return ClosestTarget
 end
 
--- ========================================================
--- GÜVENLİ VE KORUMALI ANA DÖNGÜ (RENDERSTEPPED)
--- ========================================================
+-- ANA MOTOR DÖNGÜSÜ
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character then return end
     
+    -- Geliştirilmiş Çapraz Platform Uyumlu Aimbot
     if AimbotEnabled then
-        local TargetPlayer = GetClosestPlayer()
+        local TargetPlayer = GetClosestPlayerToMouse()
         if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, TargetPlayer.Character.Head.Position)
+            local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetPlayer.Character.Head.Position)
+            if OnScreen then
+                -- Mac/PC/Android executor'ların ortak desteklediği fare sinyal simülasyonu
+                if sethiddenproperty or (syn and syn.mousemove) then
+                    -- Eğer gelişmiş bir executor ise pürüzsüz fare kaydırması yapar
+                    local mousemove = (syn and syn.mousemove) or mousemove
+                    mousemove(ScreenPos.X, ScreenPos.Y)
+                else
+                    -- Standart executorlar için kamerayı sarsmadan hedefe doğrudan odaklar
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, TargetPlayer.Character.Head.Position)
+                end
+            end
         end
     end
     
+    -- ESP ÇALIŞMA MANTIĞI
     if EspEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
@@ -181,39 +181,6 @@ RunService.RenderStepped:Connect(function()
             else
                 if player.Character and player.Character:FindFirstChild("VeraHighlight") then
                     player.Character.VeraHighlight:Destroy()
-                end
-            end
-        end
-    end
-end)
-
--- ========================================================
--- AYRI CO-ROUTINE: LOBİ & DUVAR KORUMALI TRIGGERBOT
--- ========================================================
-task.spawn(function()
-    while true do
-        task.wait(0.03) 
-        
-        if LocalPlayer.Character and TriggerbotEnabled and Mouse.Target then
-            local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
-            if TargetModel then
-                local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
-                
-                -- Triggerbot için de duvar kontrolü: Sadece hedef parça görünürse ateş et
-                if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 and IsVisible(Mouse.Target) then
-                    
-                    if mouse1press and mouse1release then
-                        mouse1press()
-                        mouse1release()
-                    elseif VirtualUser then
-                        VirtualUser:CaptureController()
-                        VirtualUser:ClickButton1(Vector2.new(0, 0))
-                    end
-                    
-                    local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                    if Tool then
-                        Tool:Activate()
-                    end
                 end
             end
         end
