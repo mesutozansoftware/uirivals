@@ -1,6 +1,6 @@
 -- ========================================================
--- VeraXS Hub v5.0 - YALNIZCA MAC & ANDROID ÖZEL STABİL SÜRÜM
--- Windows Desteği Tamamen Kaldırılmıştır.
+-- VeraXS Hub v7.5 - KESİNTİSİZ TAM PRO SÜRÜMÜ
+-- Mac & Android (Mobil / Emülatör) İçin Özel Optimize Edilmiştir.
 -- Menüyü Gizlemek/Açmak İçin Klavyeden "H" Tuşuna Basın!
 -- ========================================================
 
@@ -12,7 +12,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Mac ve Android için en kararlı GUI Ebeveynini Seçme Protokolü
+-- Çevresel GUI Katmanı Seçimi
 local TargetGuiParent = game:GetService("CoreGui")
 if not pcall(function() local a = game.CoreGui.Name end) then
     TargetGuiParent = LocalPlayer:WaitForChild("PlayerGui")
@@ -32,7 +32,7 @@ ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 190)
+MainFrame.Size = UDim2.new(0, 240, 0, 260)
 MainFrame.AnchorPoint = Vector2.new(1, 0.5) 
 MainFrame.Position = UDim2.new(0.98, 0, 0.5, 0) 
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -46,14 +46,13 @@ MainFrame.Parent = ScreenGui
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "  VeraXS Hub v5 [Mac & Mobile]"
+Title.Text = "  VeraXS Hub v7.5 [Weapon Morph]"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 12
+Title.TextSize = 11
 Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
--- Mac klavyeleri için H tuşu gizleme özelliği
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end 
     if input.KeyCode == Enum.KeyCode.H then
@@ -65,6 +64,16 @@ local AimbotEnabled = false
 local TriggerbotEnabled = false
 local EspEnabled = false
 local HoldingRightClick = false
+
+-- Dönüştürülecek Silah Model Veritabanı (Rivals ID'leri)
+local WeaponMorphs = {
+    {Name = "Orijinal Silah", MeshID = "Original"},
+    {Name = "Görsel RPG Yap", MeshID = "rbxassetid://9422002760"},
+    {Name = "Görsel AWP Yap", MeshID = "rbxassetid://9421997354"},
+    {Name = "Görsel AK-47 Yap", MeshID = "rbxassetid://9422005431"}
+}
+local MorphIndex = 1
+local ChosenMeshID = "Original"
 
 local function CreateMenuButton(text, positionY, callback)
     local Button = Instance.new("TextButton")
@@ -93,35 +102,44 @@ local function CreateMenuButton(text, positionY, callback)
         end
         callback(state)
     end)
+    return Button
 end
 
 CreateMenuButton("Auto Aim (Sağ Tık Kilit)", 45, function(status) AimbotEnabled = status end)
 CreateMenuButton("Triggerbot (Mac/Android)", 90, function(status) TriggerbotEnabled = status end)
-CreateMenuButton("ESP (Duvar Arkası Mor)", 135, function(status) 
-    EspEnabled = status 
-    if not status then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player.Character and player.Character:FindFirstChild("VeraHighlight") then
-                player.Character.VeraHighlight:Destroy()
-            end
-        end
-    end
+CreateMenuButton("ESP (Duvar Arkası Mor)", 135, function(status) EspEnabled = status end)
+
+-- SILAH MODELİ DEĞİŞTİRİCİ BUTONU (ALT PANEL)
+local MorphSelectorBtn = Instance.new("TextButton")
+MorphSelectorBtn.Size = UDim2.new(1, -20, 0, 45)
+MorphSelectorBtn.Position = UDim2.new(0, 10, 0, 180)
+MorphSelectorBtn.BackgroundColor3 = Color3.fromRGB(55, 35, 65)
+MorphSelectorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MorphSelectorBtn.Text = "Silah Görünümü:\nOrijinal"
+MorphSelectorBtn.TextSize = 11
+MorphSelectorBtn.Font = Enum.Font.SourceSansBold
+MorphSelectorBtn.BorderSizePixel = 1
+MorphSelectorBtn.BorderColor3 = Color3.fromRGB(175, 25, 255)
+MorphSelectorBtn.Parent = MainFrame
+
+MorphSelectorBtn.MouseButton1Click:Connect(function()
+    MorphIndex = MorphIndex + 1
+    if MorphIndex > #WeaponMorphs then MorphIndex = 1 end
+    
+    local CurrentMorph = WeaponMorphs[MorphIndex]
+    ChosenMeshID = CurrentMorph.MeshID
+    MorphSelectorBtn.Text = "Silah Görünümü:\n" .. CurrentMorph.Name
 end)
 
--- Mac/PC için mouse sağ tık durumunu izleme
 UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        HoldingRightClick = true
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRightClick = true end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        HoldingRightClick = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRightClick = false end
 end)
 
 -- ========================================================
--- 2. DUVAR & ENGEL KONTROLÜ (RAYCAST)
+-- 2. DUVAR ARKASI KONTROLÜ (RAYCAST ENGINE)
 -- ========================================================
 local function IsVisible(targetPart)
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return false end
@@ -131,14 +149,12 @@ local function IsVisible(targetPart)
     RaycastParamsArgs.FilterInstanceTable = {LocalPlayer.Character, Camera}
     RaycastParamsArgs.FilterType = Enum.RaycastFilterType.Exclude
     local Result = workspace:Raycast(Origin, Direction, RaycastParamsArgs)
-    if Result == nil or Result.Instance:IsDescendantOf(targetPart.Parent) then
-        return true
-    end
+    if Result == nil or Result.Instance:IsDescendantOf(targetPart.Parent) then return true end
     return false
 end
 
 -- ========================================================
--- 3. HEDEF BULUCU (LOBİ KORUMALI)
+-- 3. HEDEF BULUCU KÖKÜ
 -- ========================================================
 local function GetClosestPlayer()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return nil end
@@ -159,13 +175,12 @@ local function GetClosestPlayer()
 end
 
 -- ========================================================
--- 4. MERKEZİ MOTOR DÖNGÜSÜ (RENDERSTEPPED)
+-- 4. MERKEZİ MOTOR (RENDERSTEPPED) DÖNGÜSÜ
 -- ========================================================
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character then return end
     
-    -- [AIMBOT MOTORU] - Sağ Tık Basılı Tutulunca Tetiklenir (Mobilde Süreklidir)
-    -- Android cihazlarda sağ tık olmadığı için mobilde dokunulduğu an otomatik nişan alır
+    -- [AIMBOT DÖNGÜSÜ]
     local IsMobile = UserInputService.TouchEnabled
     if AimbotEnabled and (HoldingRightClick or IsMobile) then
         local TargetPlayer = GetClosestPlayer()
@@ -174,7 +189,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- [ESP MOTORU] - Kararlı Mor Vurgu Çizgileri
+    -- [ESP DÖNGÜSÜ]
     if EspEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
@@ -196,34 +211,45 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
 
--- ========================================================
--- 5. MAC & ANDROID UYUMLU TRIGGERBOT (SABİT DÖNGÜ)
--- ========================================================
-task.spawn(function()
-    while true do
-        task.wait(0.03) -- İşlemciyi yormayan çökme korumalı bekleme süresi
-        
-        if LocalPlayer.Character and TriggerbotEnabled and Mouse.Target then
-            local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
-            if TargetModel then
-                local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
-                if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 and IsVisible(Mouse.Target) then
-                    
-                    -- Mac (Opiumware/Solara) ve Android (Delta vb.) için en kararlı sanal dokunuş motoru
-                    if VirtualUser then
-                        VirtualUser:CaptureController()
-                        VirtualUser:ClickButton1(Vector2.new(0, 0))
-                    end
-                    
-                    -- Mac/Android ortak entegrasyonu: Oyun içi araç aktivasyonu
-                    local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                    if Tool then
-                        Tool:Activate()
+    -- [SİLAH MODELİ DEĞİŞTİRİCİ MOTORU]
+    local Tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if Tool then
+        if ChosenMeshID ~= "Original" then
+            for _, part in ipairs(Tool:GetDescendants()) do
+                if part:IsA("MeshPart") or part:IsA("SpecialMesh") then
+                    if part:IsA("MeshPart") and part.MeshId ~= ChosenMeshID then
+                        part.MeshId = ChosenMeshID
+                        part.TextureID = "" 
+                    elseif part:IsA("SpecialMesh") and part.MeshId ~= ChosenMeshID then
+                        part.MeshId = ChosenMeshID
+                        part.TextureId = ""
                     end
                 end
             end
         end
     end
+end)
+
+-- ========================================================
+-- 5. TRIGGERBOT MOTOR DÖNGÜSÜ (CO-ROUTINE GÜVENLİ)
+-- ========================================================
+task.spawn(function()
+    while true do
+        task.wait(0.03)
+        if LocalPlayer.Character and TriggerbotEnabled and Mouse.Target then
+local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
+if TargetModel then
+local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
+if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 and IsVisible(Mouse.Target) then
+if VirtualUser then
+VirtualUser:CaptureController()
+VirtualUser:ClickButton1(Vector2.new(0, 0))
+end
+local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+if Tool then Tool:Activate() end
+end
+end
+end
+end
 end)
