@@ -1,5 +1,5 @@
 -- ========================================================
--- VeraXS Hub v3 - ULTRA SPAM TRIGGERBOT & CROSS-PLATFORM
+-- VeraXS Hub v3 - DUVAR ARKASI (WALL-CHECK) KORUMALI MULTI
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -91,7 +91,7 @@ local function CreateMenuButton(text, positionY, callback)
 end
 
 CreateMenuButton("Auto Aim (Kesin Kilit)", 45, function(status) AimbotEnabled = status end)
-CreateMenuButton("Triggerbot (Mermi Spam)", 90, function(status) TriggerbotEnabled = status end)
+CreateMenuButton("Triggerbot (Hızlı Spam)", 90, function(status) TriggerbotEnabled = status end)
 CreateMenuButton("ESP (Tüm Cihazlar)", 135, function(status) 
     EspEnabled = status 
     if not status then
@@ -103,15 +103,48 @@ CreateMenuButton("ESP (Tüm Cihazlar)", 135, function(status)
     end
 end)
 
+-- ========================================================
+-- DUVAR / ENGEL KONTROLÜ (RAYCASTING WALL-CHECK)
+-- ========================================================
+local function IsVisible(targetPart)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return false end
+    
+    local Origin = Camera.CFrame.Position
+    local Direction = (targetPart.Position - Origin)
+    
+    local RaycastParamsArgs = RaycastParams.new()
+    -- Işın atılırken kendi karakterimizi ve haritadaki görünmez efektleri yok saymasını sağlıyoruz
+    RaycastParamsArgs.FilterInstanceTable = {LocalPlayer.Character, Camera}
+    RaycastParamsArgs.FilterType = Enum.RaycastFilterType.Exclude
+    RaycastParamsArgs.IgnoreWater = true
+    
+    local Result = workspace:Raycast(Origin, Direction, RaycastParamsArgs)
+    
+    -- Eğer ışın hedefe ulaşana kadar hiçbir şeye (duvara) çarpmadıysa veya çarptığı şey düşmanın kendi vücuduysa true döner
+    if Result == nil or Result.Instance:IsDescendantOf(targetPart.Parent) then
+        return true
+    end
+    return false
+end
+
+-- ========================================================
+-- KORUMALI EN YAKIN HEDEF BULUCU (DUVAR KONTROLLÜ)
+-- ========================================================
 local function GetClosestPlayer()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return nil end
+    
     local ClosestTarget = nil
     local ShortestDistance = math.huge
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local Distance = (Camera.CFrame.Position - player.Character.Head.Position).magnitude
-            if Distance < ShortestDistance then
-                ShortestDistance = Distance
-                ClosestTarget = player
+            
+            -- Duvar Kontrolü: Eğer düşman duvar arkasındaysa onu pas geçiyoruz (Çökmeyi önler)
+            if IsVisible(player.Character.Head) then
+                local Distance = (Camera.CFrame.Position - player.Character.Head.Position).magnitude
+                if Distance < ShortestDistance then
+                    ShortestDistance = Distance
+                    ClosestTarget = player
+                end
             end
         end
     end
@@ -119,43 +152,18 @@ local function GetClosestPlayer()
 end
 
 -- ========================================================
--- YÜKSEK HIZLI ANA DÖNGÜ (RENDERSTEPPED)
+-- GÜVENLİ VE KORUMALI ANA DÖNGÜ (RENDERSTEPPED)
 -- ========================================================
 RunService.RenderStepped:Connect(function()
+    if not LocalPlayer.Character then return end
     
-    -- [AIMBOT]
     if AimbotEnabled then
         local TargetPlayer = GetClosestPlayer()
         if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, TargetPlayer.Character.Head.Position)
         end
     end
-
-    -- [ULTRA SPAM TRIGGERBOT] - Sıfır Gecikmeli Arka Arkaya Sıkma
-    if TriggerbotEnabled and Mouse.Target then
-        local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
-        if TargetModel then
-            local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
-            if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 then
-                
-                -- Gecikme süreleri (task.wait) tamamen kaldırıldı, RenderStepped hızında spam atar:
-                if mouse1press and mouse1release then
-                    mouse1press()
-                    mouse1release()
-                elseif VirtualUser then
-                    VirtualUser:CaptureController()
-                    VirtualUser:ClickButton1(Vector2.new(0, 0))
-                end
-                
-                local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if Tool then
-                    Tool:Activate()
-                end
-            end
-        end
-    end
     
-    -- [EVRENSEL ESP]
     if EspEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
@@ -173,6 +181,39 @@ RunService.RenderStepped:Connect(function()
             else
                 if player.Character and player.Character:FindFirstChild("VeraHighlight") then
                     player.Character.VeraHighlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+-- ========================================================
+-- AYRI CO-ROUTINE: LOBİ & DUVAR KORUMALI TRIGGERBOT
+-- ========================================================
+task.spawn(function()
+    while true do
+        task.wait(0.03) 
+        
+        if LocalPlayer.Character and TriggerbotEnabled and Mouse.Target then
+            local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
+            if TargetModel then
+                local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
+                
+                -- Triggerbot için de duvar kontrolü: Sadece hedef parça görünürse ateş et
+                if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 and IsVisible(Mouse.Target) then
+                    
+                    if mouse1press and mouse1release then
+                        mouse1press()
+                        mouse1release()
+                    elseif VirtualUser then
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    end
+                    
+                    local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if Tool then
+                        Tool:Activate()
+                    end
                 end
             end
         end
