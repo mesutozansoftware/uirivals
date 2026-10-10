@@ -1,6 +1,7 @@
 -- ========================================================
--- VeraXS Hub v4.0 - EVRENSEL FARE KİLİTLİ STABİL MOTHERSCRIPT
--- Windows, Android ve Mac üzerinde %100 Çalışır
+-- VeraXS Hub v5.0 - YALNIZCA MAC & ANDROID ÖZEL STABİL SÜRÜM
+-- Windows Desteği Tamamen Kaldırılmıştır.
+-- Menüyü Gizlemek/Açmak İçin Klavyeden "H" Tuşuna Basın!
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -9,7 +10,9 @@ local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
+-- Mac ve Android için en kararlı GUI Ebeveynini Seçme Protokolü
 local TargetGuiParent = game:GetService("CoreGui")
 if not pcall(function() local a = game.CoreGui.Name end) then
     TargetGuiParent = LocalPlayer:WaitForChild("PlayerGui")
@@ -19,7 +22,9 @@ if TargetGuiParent:FindFirstChild("VeraCrossGui") then
     TargetGuiParent.VeraCrossGui:Destroy()
 end
 
--- SAF ARAYÜZ KURULUMU
+-- ========================================================
+-- 1. ARAYÜZ (GUI) KURULUMU (SAĞ ORTA SABİT)
+-- ========================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VeraCrossGui"
 ScreenGui.Parent = TargetGuiParent
@@ -27,7 +32,7 @@ ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 150)
+MainFrame.Size = UDim2.new(0, 220, 0, 190)
 MainFrame.AnchorPoint = Vector2.new(1, 0.5) 
 MainFrame.Position = UDim2.new(0.98, 0, 0.5, 0) 
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -41,13 +46,14 @@ MainFrame.Parent = ScreenGui
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "  VeraXS Hub v4 [H Tuşu]"
+Title.Text = "  VeraXS Hub v5 [Mac & Mobile]"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 12
 Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
+-- Mac klavyeleri için H tuşu gizleme özelliği
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end 
     if input.KeyCode == Enum.KeyCode.H then
@@ -56,7 +62,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 local AimbotEnabled = false
+local TriggerbotEnabled = false
 local EspEnabled = false
+local HoldingRightClick = false
 
 local function CreateMenuButton(text, positionY, callback)
     local Button = Instance.new("TextButton")
@@ -87,8 +95,9 @@ local function CreateMenuButton(text, positionY, callback)
     end)
 end
 
-CreateMenuButton("Auto Aim (Kesin Kilit)", 45, function(status) AimbotEnabled = status end)
-CreateMenuButton("ESP (Tüm Cihazlar)", 90, function(status) 
+CreateMenuButton("Auto Aim (Sağ Tık Kilit)", 45, function(status) AimbotEnabled = status end)
+CreateMenuButton("Triggerbot (Mac/Android)", 90, function(status) TriggerbotEnabled = status end)
+CreateMenuButton("ESP (Duvar Arkası Mor)", 135, function(status) 
     EspEnabled = status 
     if not status then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -99,7 +108,21 @@ CreateMenuButton("ESP (Tüm Cihazlar)", 90, function(status)
     end
 end)
 
--- DUVAR KONTROLÜ
+-- Mac/PC için mouse sağ tık durumunu izleme
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = false
+    end
+end)
+
+-- ========================================================
+-- 2. DUVAR & ENGEL KONTROLÜ (RAYCAST)
+-- ========================================================
 local function IsVisible(targetPart)
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return false end
     local Origin = Camera.CFrame.Position
@@ -107,7 +130,6 @@ local function IsVisible(targetPart)
     local RaycastParamsArgs = RaycastParams.new()
     RaycastParamsArgs.FilterInstanceTable = {LocalPlayer.Character, Camera}
     RaycastParamsArgs.FilterType = Enum.RaycastFilterType.Exclude
-    RaycastParamsArgs.IgnoreWater = true
     local Result = workspace:Raycast(Origin, Direction, RaycastParamsArgs)
     if Result == nil or Result.Instance:IsDescendantOf(targetPart.Parent) then
         return true
@@ -115,24 +137,20 @@ local function IsVisible(targetPart)
     return false
 end
 
--- EKRANDAKİ EN YAKIN HEDEFİ BULUCU (TİTREMEYİ ÖNLER)
-local function GetClosestPlayerToMouse()
+-- ========================================================
+-- 3. HEDEF BULUCU (LOBİ KORUMALI)
+-- ========================================================
+local function GetClosestPlayer()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return nil end
     local ClosestTarget = nil
     local ShortestDistance = math.huge
-    
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
             if IsVisible(player.Character.Head) then
-                -- Düşmanın kafasının ekrandaki 2D pozisyonunu alır
-                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
-                if OnScreen then
-                    -- Farenin imlecine en yakın olan oyuncuyu hesaplar
-                    local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).magnitude
-                    if Distance < ShortestDistance then
-                        ShortestDistance = Distance
-                        ClosestTarget = player
-                    end
+                local Distance = (Camera.CFrame.Position - player.Character.Head.Position).magnitude
+                if Distance < ShortestDistance then
+                    ShortestDistance = Distance
+                    ClosestTarget = player
                 end
             end
         end
@@ -140,30 +158,23 @@ local function GetClosestPlayerToMouse()
     return ClosestTarget
 end
 
--- ANA MOTOR DÖNGÜSÜ
+-- ========================================================
+-- 4. MERKEZİ MOTOR DÖNGÜSÜ (RENDERSTEPPED)
+-- ========================================================
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character then return end
     
-    -- Geliştirilmiş Çapraz Platform Uyumlu Aimbot
-    if AimbotEnabled then
-        local TargetPlayer = GetClosestPlayerToMouse()
+    -- [AIMBOT MOTORU] - Sağ Tık Basılı Tutulunca Tetiklenir (Mobilde Süreklidir)
+    -- Android cihazlarda sağ tık olmadığı için mobilde dokunulduğu an otomatik nişan alır
+    local IsMobile = UserInputService.TouchEnabled
+    if AimbotEnabled and (HoldingRightClick or IsMobile) then
+        local TargetPlayer = GetClosestPlayer()
         if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
-            local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetPlayer.Character.Head.Position)
-            if OnScreen then
-                -- Mac/PC/Android executor'ların ortak desteklediği fare sinyal simülasyonu
-                if sethiddenproperty or (syn and syn.mousemove) then
-                    -- Eğer gelişmiş bir executor ise pürüzsüz fare kaydırması yapar
-                    local mousemove = (syn and syn.mousemove) or mousemove
-                    mousemove(ScreenPos.X, ScreenPos.Y)
-                else
-                    -- Standart executorlar için kamerayı sarsmadan hedefe doğrudan odaklar
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, TargetPlayer.Character.Head.Position)
-                end
-            end
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, TargetPlayer.Character.Head.Position)
         end
     end
     
-    -- ESP ÇALIŞMA MANTIĞI
+    -- [ESP MOTORU] - Kararlı Mor Vurgu Çizgileri
     if EspEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
@@ -181,6 +192,36 @@ RunService.RenderStepped:Connect(function()
             else
                 if player.Character and player.Character:FindFirstChild("VeraHighlight") then
                     player.Character.VeraHighlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+-- ========================================================
+-- 5. MAC & ANDROID UYUMLU TRIGGERBOT (SABİT DÖNGÜ)
+-- ========================================================
+task.spawn(function()
+    while true do
+        task.wait(0.03) -- İşlemciyi yormayan çökme korumalı bekleme süresi
+        
+        if LocalPlayer.Character and TriggerbotEnabled and Mouse.Target then
+            local TargetModel = Mouse.Target:FindAncestorOfClass("Model")
+            if TargetModel then
+                local HitPlayer = Players:GetPlayerFromCharacter(TargetModel)
+                if HitPlayer and HitPlayer ~= LocalPlayer and TargetModel:FindFirstChild("Humanoid") and TargetModel.Humanoid.Health > 0 and IsVisible(Mouse.Target) then
+                    
+                    -- Mac (Opiumware/Solara) ve Android (Delta vb.) için en kararlı sanal dokunuş motoru
+                    if VirtualUser then
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(0, 0))
+                    end
+                    
+                    -- Mac/Android ortak entegrasyonu: Oyun içi araç aktivasyonu
+                    local Tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if Tool then
+                        Tool:Activate()
+                    end
                 end
             end
         end
